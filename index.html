@@ -1,0 +1,122 @@
+<!DOCTYPE html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScreenAssist</title>
+<meta name="description" content="Title/abstract screening for systematic reviews with an on-device learning ranker, stopping heuristic, and built-in random-effects meta-analysis. Free, private, no install.">
+<meta name="theme-color" content="#f8f7f3">
+<meta name="theme-color" content="#f8f7f3">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta property="og:title" content="ScreenAssist">
+<meta property="og:description" content="Title/abstract screening for systematic reviews with an on-device learning ranker, stopping heuristic, and built-in random-effects meta-analysis. Free, private, no install.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+
+<style>
+:root{color-scheme:light;--bg:#f8f7f3;--fg:#20262a;--mut:#5c6663;--card:#ffffff;--bd:#e5e3dc;--ac:#0f766e;--ok:#15803d;--no:#b91c1c;--mb:#b45309}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#191816;--fg:#edeae3;--mut:#a9a398;--card:#211f1c;--bd:#383530;--ac:#35b5a9;--ok:#6fce7f;--no:#f08579;--mb:#e0a13c}
+*{box-sizing:border-box}body{margin:0;font:15.5px/1.55 system-ui,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+header{display:flex;gap:6px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg);z-index:3;flex-wrap:wrap}h1{font-size:17px;margin:0 10px 0 0}main{max-width:1100px;margin:0 auto;padding:12px 16px 60px}
+button,input,select,textarea,.btn{font:inherit;color:inherit;background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:5px 10px}button{cursor:pointer}button:hover{border-color:var(--ac)}button.on,button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+button.y{background:var(--ok);color:#fff;border-color:var(--ok);font-size:16px;padding:10px 28px}button.n{background:var(--no);color:#fff;border-color:var(--no);font-size:16px;padding:10px 28px}
+.m{color:var(--mut);font-size:12px}.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.c{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin:8px 0}
+#g{display:grid;grid-template-columns:1fr 300px;gap:16px}@media(max-width:800px){#g{grid-template-columns:1fr}}
+.ab{font:16px/1.65 Georgia,serif}mark.g{background:#1b8a4b55;color:inherit}mark.r{background:#c0392b55;color:inherit}.warn{border-left:4px solid var(--mb)}
+table{border-collapse:collapse;width:100%}td,th{padding:3px;text-align:left}td input{width:100%;min-width:70px}textarea{width:100%;min-height:50px}
+
+h1,h2,h3{font-family:ui-serif,"Iowan Old Style",Georgia,"Times New Roman",serif;letter-spacing:-.01em}
+.omlink{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--bd);border-radius:9px;background:var(--card);color:var(--fg);text-decoration:none;font-size:12.5px;font-weight:600;cursor:pointer}
+.omlink:hover{border-color:var(--ac);color:var(--ac)}
+#theme-btn{width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;color:var(--mut)}
+#theme-btn:hover{color:var(--fg);border-color:var(--ac)}
+#theme-btn svg{width:16px;height:16px}
+.bar>*{min-width:0}.bar textarea{flex:1 1 140px;width:140px;max-width:100%}
+
+/* portfolio integration: keep grids shrinkable and textareas reflowable */
+#g{grid-template-columns:minmax(0,1fr) 300px!important}
+@media(max-width:800px){#g{grid-template-columns:minmax(0,1fr)!important}}
+textarea{min-width:0;width:100%}
+.bar>*{min-width:0}
+.bar textarea{flex:1 1 140px;width:140px;max-width:100%}
+input[type=file]{max-width:100%}
+</style></head><body>
+<header><h1>ScreenAssist</h1><span id="tb"></span><span style="flex:1"></span><a class="omlink" href="https://github.com/PsychandMe">More tools</a><button id="theme-btn" aria-label="Switch theme"></button></header><main id="main"></main>
+<script>
+const $=s=>document.querySelector(s),E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let S={recs:[],hist:[],kw:'',xkw:'',stop:50,ma:[],mode:'d',cur:null,...JSON.parse(localStorage.getItem('sa')||'{}')},tab='scr',CUR=null,MOD=false,V=0;
+const sv=()=>{try{localStorage.setItem('sa',JSON.stringify({...S,recs:S.recs.map(({v,s,...r})=>r)}))}catch(e){}};
+const dl=(n,t,m='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:m+';charset=utf-8'}));a.download=n;a.click()},q=s=>'"'+String(s??'').replace(/"/g,'""')+'"',nm=t=>(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+const SW=new Set('the and for with from that this these those are was were been has have had not but its our their than then which into using used between among also can may all any more most such'.split(' '));
+const tok=t=>(t||'').toLowerCase().replace(/[^a-z0-9\s-]/g,' ').split(/\s+/).filter(w=>w.length>2&&!SW.has(w));
+function ris(t){const o=[];let r=null;t.split(/\r?\n/).forEach(l=>{const m=l.match(/^([A-Z][A-Z0-9])  - ?(.*)$/);if(!m)return;const[,k,v]=m;if(k=='TY')r={au:[]};else if(k=='ER'){if(r&&r.ti)o.push(r);r=null}else if(r){if(k=='TI'||k=='T1')r.ti=(r.ti||'')+v;else if(k=='AB'||k=='N2')r.ab=(r.ab||'')+v;else if(k=='AU'||k=='A1')r.au.push(v);else if(k=='PY'||k=='Y1')r.yr=(v.match(/\d{4}/)||[''])[0];else if(k=='DO')r.doi=v.replace(/^https?:\/\/(dx\.)?doi\.org\//,'');else if(k=='JO'||k=='T2'||k=='JF')r.jn=r.jn||v}});return o.map(r=>({...r,au:r.au.join('; ')}))}
+function csv(t){const rows=[];let r=[],f='',qq=false;for(let i=0;i<t.length;i++){const c=t[i];if(qq){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else qq=false}else f+=c}else if(c=='"')qq=true;else if(c==','){r.push(f);f=''}else if(c=='\n'||c=='\r'){if(c=='\r'&&t[i+1]=='\n')i++;r.push(f);f='';if(r.some(x=>x))rows.push(r);r=[]}else f+=c}if(f||r.length){r.push(f);rows.push(r)}
+const h=(rows.shift()||[]).map(x=>x.toLowerCase().trim()),g=(r,...ks)=>{for(const k of ks){const i=h.findIndex(x=>x==k||x.includes(k));if(i>=0&&r[i])return r[i]}return''};
+return rows.map(r=>({ti:g(r,'title'),ab:g(r,'abstract'),au:g(r,'authors','author'),yr:(g(r,'year','date').match(/\d{4}/)||[''])[0],doi:g(r,'doi'),jn:g(r,'journal','source')})).filter(r=>r.ti)}
+function addRecs(a){let n=0,d=0;a.forEach(x=>{if(!x.ti)return;const dup=S.recs.some(r=>(x.doi&&r.doi&&r.doi.toLowerCase()==x.doi.toLowerCase())||nm(r.ti)==nm(x.ti));if(dup){d++;return}S.recs.push({id:Math.random().toString(36).slice(2,9),ti:x.ti,ab:x.ab||'',au:x.au||'',yr:x.yr||'',doi:x.doi||'',jn:x.jn||'',lab:null});n++});return{n,d}}
+async function load(el){let tot={n:0,d:0};for(const f of el.files){const t=await f.text(),x=f.name.toLowerCase();let a=[];
+if(x.endsWith('.json')){const p=JSON.parse(t);if(p.recs){S={...S,...p};a=[]}else a=(p.lib||[]).map(r=>({ti:r.title,au:(r.au||[]).join('; '),yr:r.year,doi:r.doi,jn:r.jn,ab:r.ab}))}else a=x.endsWith('.csv')?csv(t):ris(t);const r=addRecs(a);tot.n+=r.n;tot.d+=r.d}
+vec();sv();R();$('#st')&&($('#st').textContent=`Added ${tot.n} records, skipped ${tot.d} duplicates.`)}
+function vec(){const N=S.recs.length,df={},T=S.recs.map(r=>{const c={};tok(r.ti+' '+r.ab).forEach(w=>c[w]=(c[w]||0)+1);Object.keys(c).forEach(w=>df[w]=(df[w]||0)+1);return c}),ix={},idf=[];let n=0;
+for(const w in df)if(df[w]>=2){ix[w]=n;idf[n]=Math.log((1+N)/(1+df[w]))+1;n++}V=n;
+S.recs.forEach((r,k)=>{const a=[];let s=0;for(const w in T[k])if(w in ix){const x=T[k][w]*idf[ix[w]];a.push([ix[w],x]);s+=x*x}s=Math.sqrt(s)||1;r.v=a.map(([i,x])=>[i,x/s])})}
+function rank(){const L=S.recs.filter(r=>r.lab!=null),U=S.recs.filter(r=>r.lab==null),R=L.filter(r=>r.lab==1),I=L.filter(r=>r.lab==0);MOD=R.length>0&&I.length>0;
+if(MOD){const wR=Math.max(1,Math.sqrt(I.length/R.length)),f1=new Float64Array(V),f0=new Float64Array(V),a=3.822,lr=new Float64Array(V);let t1=0,t0=0;
+R.forEach(r=>r.v.forEach(([i,x])=>{f1[i]+=x*wR;t1+=x*wR}));I.forEach(r=>r.v.forEach(([i,x])=>{f0[i]+=x;t0+=x}));
+for(let i=0;i<V;i++)lr[i]=Math.log((f1[i]+a)/(t1+a*V))-Math.log((f0[i]+a)/(t0+a*V));U.forEach(r=>{r.s=r.v.reduce((s,[i,x])=>s+x*lr[i],0)})}
+else{const k=(S.kw||'').toLowerCase().split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);U.forEach(r=>{const t=(r.ti+' '+r.ab).toLowerCase();r.s=k.reduce((s,w)=>s+t.split(w).length-1,0)})}
+return U.map((r,i)=>[r,i]).sort((a,b)=>b[0].s-a[0].s||a[1]-b[1]).map(x=>x[0])}
+function lab(l){if(!CUR)return;CUR.lab=l;S.hist.push(CUR.id);S.cur=null;sv();R()}
+function undo(){const id=S.hist.pop();if(!id)return;const r=S.recs.find(x=>x.id==id);r.lab=null;S.cur=id;sv();R()}
+const rnd=()=>{const U=S.recs.filter(r=>r.lab==null);if(U.length){S.cur=U[Math.floor(Math.random()*U.length)].id;R()}};
+function hl(t){let h=E(t);[[S.kw,'g'],[S.xkw,'r']].forEach(([s,c])=>{const k=(s||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean).map(x=>E(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));if(k.length)h=h.replace(new RegExp('(<[^>]+>)|('+k.join('|')+')','gi'),(m,tg,w)=>tg||`<mark class="${c}">${w}</mark>`)});return h}
+async function fetchAbs(){const T=S.recs.filter(r=>r.doi&&!r.ab),st=$('#st');let got=0;for(let i=0;i<T.length;i+=40){const c=T.slice(i,i+40);st.textContent=`Fetching abstracts ${i}/${T.length}…`;
+try{const j=await(await fetch('https://api.openalex.org/works?per-page=50&select=doi,abstract_inverted_index&filter=doi:'+c.map(r=>encodeURIComponent(r.doi)).join('|'))).json();
+(j.results||[]).forEach(w=>{if(!w.abstract_inverted_index)return;const d=(w.doi||'').replace(/^https?:\/\/doi\.org\//,'').toLowerCase(),r=c.find(x=>x.doi.toLowerCase()==d);if(!r)return;const a=[];for(const k in w.abstract_inverted_index)w.abstract_inverted_index[k].forEach(p=>a[p]=k);r.ab=a.join(' ');got++})}catch(e){st.textContent='Fetch failed: '+e.message;return}}
+vec();sv();st.textContent=`Found ${got} abstracts of ${T.length} requested.`;R()}
+function scr(){const m=$('#main');const imp=`<div class="c"><h3>Import records</h3><p class="m">RIS, CSV (title, abstract, authors, year, doi, journal columns) or a Research Hub backup (.json). Titles alone rank poorly, so use abstracts where you can.</p><input type="file" multiple accept=".ris,.txt,.csv,.json" onchange="load(this)"> <span id="st" class="m"></span></div>`;
+if(!S.recs.length){m.innerHTML=imp;return}
+const Q=rank(),M=new Map(S.recs.map(r=>[r.id,r])),n=S.recs.length,sc=S.recs.filter(r=>r.lab!=null),rel=sc.filter(r=>r.lab==1).length;CUR=(S.cur&&M.get(S.cur)&&M.get(S.cur).lab==null?M.get(S.cur):Q[0])||null;
+let cons=0;for(let i=S.hist.length-1;i>=0&&M.get(S.hist[i]).lab==0;i--)cons++;const last=S.hist.slice(-50).map(id=>M.get(id).lab),hit=last.length?Math.round(last.reduce((a,b)=>a+b,0)/last.length*100):0;
+let c=0;const pts=S.hist.map((id,i)=>{c+=M.get(id).lab;return[i+1,c]}),mx=Math.max(1,c),W=Math.max(1,S.hist.length),
+path=pts.map(([x,y],i)=>(i?'L':'M')+(10+x/W*280).toFixed(1)+' '+(110-y/mx*100).toFixed(1)).join('');
+const r=CUR;m.innerHTML=`<div id="g"><div>`+(r?`${cons>=S.stop?`<div class="c warn"><b>Stopping heuristic reached:</b> ${cons} consecutive irrelevant records. Consider stopping, but this does not guarantee that every relevant record has been found. Checking a random sample of the remainder is sensible.</div>`:''}<div class="c"><div class="m">${MOD?'Ranked by the model (naive Bayes on TF-IDF), most likely relevant first':'Keyword ranking until you have labelled at least one relevant and one irrelevant record'} · ${Q.length} left</div><h2 style="margin:6px 0">${hl(r.ti)}</h2><div class="m">${E(r.au)} ${r.yr?'('+E(r.yr)+')':''} ${E(r.jn)} ${r.doi?`· <a href="https://doi.org/${E(r.doi)}" target="_blank">DOI</a>`:''}</div><div class="ab" style="margin-top:10px">${r.ab?hl(r.ab):'<i class="m">No abstract available.</i>'}</div></div>
+<div class="bar"><button class="y" onclick="lab(1)">Relevant (R)</button><button class="n" onclick="lab(0)">Irrelevant (I)</button><button onclick="undo()">Undo (U)</button><button onclick="rnd()">Random record</button></div>`:'<div class="c"><b>All records screened.</b></div><div class="bar"><button onclick="undo()">Undo (U)</button></div>')+
+`<div class="c"><b>Settings</b><div class="m">Include terms (highlighted green, also used for the first ranking) and exclude terms (red), comma separated</div><textarea onchange="S.kw=this.value;sv();R()">${E(S.kw)}</textarea><textarea onchange="S.xkw=this.value;sv();R()">${E(S.xkw)}</textarea><label>Stop after <input type="number" min="1" value="${S.stop}" style="width:70px" onchange="S.stop=+this.value||50;sv();R()"> consecutive irrelevant</label></div>${imp}<div class="bar"><button onclick="fetchAbs()">Fetch missing abstracts (OpenAlex)</button></div></div>
+<div><div class="c"><b>Progress</b><br>Screened <b>${sc.length}</b> of ${n} (${Math.round(sc.length/n*100)}%)<br>Relevant <b>${rel}</b> · Irrelevant ${sc.length-rel}<br>Consecutive irrelevant: <b>${cons}</b><br>Hit rate, last 50: <b>${hit}%</b>
+<svg viewBox="0 0 300 120" style="width:100%;margin-top:6px"><path d="M10 10V110H290" fill="none" stroke="var(--bd)"/><path d="${path}" fill="none" stroke="var(--ac)" stroke-width="2"/><text x="12" y="20" font-size="9" fill="var(--mut)">relevant found: ${c}</text><text x="290" y="120" font-size="9" fill="var(--mut)" text-anchor="end">records screened</text></svg></div>
+<div class="c m">The model learns from every decision you make. It changes the order of screening; it does not decide inclusion. Only you screen.</div></div></div>`}
+function erfc(x){const t=1/(1+.3275911*x);return t*(.254829592+t*(-.284496736+t*(1.421413741+t*(-1.453152027+t*1.061405429))))*Math.exp(-x*x)}
+function pool(){const d=S.ma.map(r=>{let y,v;if(S.mode=='d'){const n1=+r.a,n2=+r.b,J=1-3/(4*(n1+n2-2)-1);y=+r.y*J;v=(n1+n2)/(n1*n2)+y*y/(2*(n1+n2))}else{y=+r.y;v=(+r.a)**2}return{l:r.l||'',y,v}}).filter(x=>isFinite(x.y)&&isFinite(x.v)&&x.v>0);
+if(d.length<2)return{d};const w=d.map(x=>1/x.v),sw=w.reduce((a,b)=>a+b),fe=d.reduce((s,x,i)=>s+w[i]*x.y,0)/sw,Q=d.reduce((s,x,i)=>s+w[i]*(x.y-fe)**2,0),df=d.length-1,C=sw-w.reduce((a,b)=>a+b*b,0)/sw,t2=Math.max(0,(Q-df)/C),ws=d.map(x=>1/(x.v+t2)),sws=ws.reduce((a,b)=>a+b),mu=d.reduce((s,x,i)=>s+ws[i]*x.y,0)/sws,se=1/Math.sqrt(sws);
+return{d,ws,mu,se,Q,df,t2,I2:Q>0?Math.max(0,(Q-df)/Q)*100:0,p:erfc(Math.abs(mu/se)/Math.SQRT2)}}
+function forest(P){const d=P.d,lo=Math.min(...d.map(x=>x.y-1.96*Math.sqrt(x.v)),P.mu-1.96*P.se),hi=Math.max(...d.map(x=>x.y+1.96*Math.sqrt(x.v)),P.mu+1.96*P.se),X=v=>230+(v-lo)/(hi-lo||1)*420,mw=Math.max(...P.ws);
+return `<svg viewBox="0 0 700 ${d.length*24+70}" style="width:100%;max-width:700px"><line x1="${X(0)}" x2="${X(0)}" y1="6" y2="${d.length*24+20}" stroke="var(--mut)" stroke-dasharray="3"/>`+d.map((x,i)=>{const y=22+i*24,s=Math.sqrt(x.v)*1.96;return `<text x="4" y="${y+4}" font-size="12" fill="currentColor">${E(x.l.slice(0,28))}</text><line x1="${X(x.y-s)}" x2="${X(x.y+s)}" y1="${y}" y2="${y}" stroke="currentColor"/><rect x="${X(x.y)-3-4*P.ws[i]/mw}" y="${y-3-4*P.ws[i]/mw}" width="${6+8*P.ws[i]/mw}" height="${6+8*P.ws[i]/mw}" fill="var(--ac)"/>`}).join('')+`<polygon points="${X(P.mu-1.96*P.se)},${d.length*24+34} ${X(P.mu)},${d.length*24+24} ${X(P.mu+1.96*P.se)},${d.length*24+34} ${X(P.mu)},${d.length*24+44}" fill="var(--ok)"/><text x="4" y="${d.length*24+38}" font-size="12" font-weight="600" fill="currentColor">Random-effects pooled</text><text x="${X(lo)}" y="${d.length*24+62}" font-size="11" fill="var(--mut)">${lo.toFixed(2)}</text><text x="${X(hi)}" y="${d.length*24+62}" font-size="11" fill="var(--mut)" text-anchor="end">${hi.toFixed(2)}</text></svg>`}
+function ma(){const P=pool(),el=$('#mr');if(!el)return;if(!P.mu&&P.mu!==0){el.innerHTML='<p class="m">Enter at least two studies.</p>';return}
+el.innerHTML=`<div class="c">Pooled ${S.mode=='d'?'Hedges’ g':'effect'} = <b>${P.mu.toFixed(3)}</b>, 95% CI [${(P.mu-1.96*P.se).toFixed(3)}, ${(P.mu+1.96*P.se).toFixed(3)}], p ${P.p<.001?'< .001':'= '+P.p.toFixed(3)}<br>Q(${P.df}) = ${P.Q.toFixed(2)}, τ² = ${P.t2.toFixed(3)}, I² = ${P.I2.toFixed(1)}%, k = ${P.d.length}</div>${P.d.length<5?'<p class="m" style="color:var(--mb)">With few studies the normal-approximation interval is too narrow and τ² is imprecise. A Hartung–Knapp adjustment is generally preferred; confirm in Jamovi or R.</p>':''}${forest(P)}`}
+function maTab(){$('#main').innerHTML=`<h3>Random-effects meta-analysis</h3><p class="m">DerSimonian–Laird pooling. In d mode the effect is converted to Hedges’ g with its sampling variance. Use this to check or sketch; verify the final analysis in Jamovi or R.</p><div class="bar"><select onchange="S.mode=this.value;sv();maTab()"><option value="d" ${S.mode=='d'?'selected':''}>Cohen’s d with n1, n2</option><option value="g" ${S.mode=='g'?'selected':''}>Generic: effect and SE</option></select><button onclick="S.ma.push({});sv();maTab()">+ Study</button></div>
+<table><tr><th>Study</th><th>${S.mode=='d'?'d':'Effect'}</th><th>${S.mode=='d'?'n1':'SE'}</th><th>${S.mode=='d'?'n2':''}</th><th></th></tr>${S.ma.map((r,i)=>`<tr>${['l','y','a','b'].map(k=>`<td>${k=='b'&&S.mode!='d'?'':`<input value="${E(r[k])}" oninput="S.ma[${i}].${k}=this.value;sv();ma()">`}</td>`).join('')}<td><button onclick="S.ma.splice(${i},1);sv();maTab()">×</button></td></tr>`).join('')}</table><div id="mr"></div>`;ma()}
+function exp(){const A=S.recs;return{
+csv:()=>dl('screening-decisions.csv','Title,Authors,Year,Journal,DOI,Decision,Order\n'+A.map(r=>[r.ti,r.au,r.yr,r.jn,r.doi,r.lab==1?'Relevant':r.lab==0?'Irrelevant':'Unscreened',S.hist.indexOf(r.id)+1||''].map(q).join(',')).join('\n'),'text/csv'),
+ris:()=>dl('relevant.ris',A.filter(r=>r.lab==1).map(r=>`TY  - JOUR\n${(r.au||'').split(/;\s*/).filter(Boolean).map(a=>'AU  - '+a).join('\n')}\nTI  - ${r.ti}\nPY  - ${r.yr}\nJO  - ${r.jn}\nDO  - ${r.doi}\nAB  - ${r.ab}\nER  - `).join('\n\n')),
+json:()=>dl('screenassist-project-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({...S,recs:A.map(({v,s,...r})=>r)}))}}
+function exTab(){const s=S.recs,n=l=>s.filter(r=>r.lab==l).length;$('#main').innerHTML=`<h3>Export</h3><div class="c">Records ${s.length} · Relevant ${n(1)} · Irrelevant ${n(0)} · Unscreened ${s.filter(r=>r.lab==null).length}<div class="m">Report the unscreened remainder and your stopping rule when describing the process (Page et al., 2021).</div></div><div class="bar"><button onclick="exp().csv()">Decisions (.csv)</button><button onclick="exp().ris()">Relevant records (.ris)</button><button onclick="exp().json()">Save project (.json)</button><button onclick="if(confirm('Clear everything?')){S={recs:[],hist:[],kw:'',xkw:'',stop:50,ma:[],mode:'d',cur:null};sv();R()}">Clear</button></div><p class="m">Autosaves in this browser. Large datasets can exceed browser storage, so use Save project regularly (reload it with the Import box on the Screen tab).</p>`}
+function R(){$('#tb').innerHTML=[['scr','Screen'],['ma','Meta-analysis'],['ex','Export']].map(([k,l])=>`<button class="${tab==k?'on':''}" onclick="tab='${k}';R()">${l}</button>`).join('');if(tab=='scr')scr();else if(tab=='ma')maTab();else exTab()}
+document.addEventListener('keydown',e=>{if(tab!='scr'||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||e.ctrlKey||e.metaKey)return;const k=e.key.toLowerCase();if(k=='r')lab(1);if(k=='i')lab(0);if(k=='u')undo()});
+if(S.recs.length)vec();R();
+</script><footer style="max-width:1100px;margin:0 auto;padding:18px 16px 28px;border-top:1px solid var(--bd);color:var(--mut);font-size:12px;display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between">
+<span>ScreenAssist — free, no account needed. Your data stays in this browser; export a backup regularly.</span>
+<span>Built by <a href="https://github.com/PsychandMe" style="color:var(--ac)">Joshua Bellot — Psych &amp; Me</a>.</span>
+</footer>
+
+
+<script>
+(function(){
+  var K="screenassist-theme",b=document.getElementById("theme-btn");
+  var MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+  function apply(t){document.documentElement.dataset.theme=t;b.innerHTML=t==="dark"?SUN:MOON;
+    document.querySelector('meta[name="theme-color"]').setAttribute("content",t==="dark"?"#211f1c":"#f8f7f3");}
+  var saved=localStorage.getItem(K);
+  apply(saved==="dark"||saved==="light"?saved:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+  b.addEventListener("click",function(){var n=document.documentElement.dataset.theme==="dark"?"light":"dark";
+    localStorage.setItem(K,n);apply(n);});
+})();
+</script>
+</body></html>
